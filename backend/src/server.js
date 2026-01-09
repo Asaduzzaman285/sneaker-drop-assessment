@@ -21,28 +21,42 @@ const io = new Server(server, {
 app.set("io", io);
 
 const expireReservations = require("./workers/expireReservations");
-setInterval(() => expireReservations(app), 1 * 1000);
 
-io.on("connection", (socket) => {
-  console.log("⚡ New client connected:", socket.id);
+// Database & Server Startup Logic
+let isDbConnected = false;
 
-  socket.on("disconnect", () => {
-    console.log("⚡ Client disconnected:", socket.id);
-  });
-});
+async function startServer() {
+  if (!isDbConnected) {
+    try {
+      await sequelize.authenticate();
+      console.log("✅ Database connected");
+      await sequelize.sync({ alter: true });
+      console.log("✅ Database synced");
+      isDbConnected = true;
+    } catch (error) {
+      console.error("❌ Startup error:", error);
+    }
+  }
+}
 
-(async () => {
-  try {
-    await sequelize.authenticate();
-    console.log("✅ Database connected");
-
-    await sequelize.sync({ alter: true });
-    console.log("✅ Database synced");
-
+// Start worker loop only if not in serverless (mostly for local) or try to run it
+// Note: setInteval expires in Vercel. We need a cron job for production really.
+if (require.main === module) {
+  (async () => {
+    await startServer();
+    setInterval(() => expireReservations(app), 5 * 1000); // 5 sec interval
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
-  } catch (error) {
-    console.error("❌ Startup error:", error);
-  }
-})();
+  })();
+} else {
+  // For Vercel: We need to connect to DB on request if not connected
+  // But we can't await in top level. 
+  // We export the handler.
+  // Ideally we wrap app to ensure DB is connected?
+  startServer();
+  // Worker won't run reliably on Vercel functions due to freeze. 
+  // Ideally use Vercel Cron.
+}
+
+module.exports = app;
