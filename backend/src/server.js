@@ -52,7 +52,12 @@ if (require.main === module) {
 } else {
   // Vercel Serverless Entry Point
   module.exports = async (req, res) => {
-    await startServer();
-    return app(req, res);
+    try {
+      await startServer();
+      return app(req, res);
+    } catch (error) {
+      console.error("Vercel Startup Error:", error);
+      res.status(500).json({ error: "Server Startup Failed", details: error.message });
+    }
   };
 }
