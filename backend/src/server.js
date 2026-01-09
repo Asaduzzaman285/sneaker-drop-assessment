@@ -50,13 +50,9 @@ if (require.main === module) {
     });
   })();
 } else {
-  // For Vercel: We need to connect to DB on request if not connected
-  // But we can't await in top level. 
-  // We export the handler.
-  // Ideally we wrap app to ensure DB is connected?
-  startServer();
-  // Worker won't run reliably on Vercel functions due to freeze. 
-  // Ideally use Vercel Cron.
+  // Vercel Serverless Entry Point
+  module.exports = async (req, res) => {
+    await startServer();
+    return app(req, res);
+  };
 }
-
-module.exports = app;
