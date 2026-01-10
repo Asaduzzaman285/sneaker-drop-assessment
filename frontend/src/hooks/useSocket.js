@@ -5,7 +5,11 @@ let socket;
 
 export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
   useEffect(() => {
-    socket = io(); // Connects to the same host/origin (proxy handles it)
+    socket = io({
+      transports: ["polling"], // Force long-polling for Vercel Serverless stability
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
 
     socket.on("connect", () => console.log("⚡ Connected to Socket.io"));
 
