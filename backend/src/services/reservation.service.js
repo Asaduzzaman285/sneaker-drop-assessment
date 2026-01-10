@@ -45,9 +45,11 @@ const reserveItem = async (user_id, drop_id, app) => {
     // Commit transaction
     await t.commit();
 
-    // Emit stock update after commit
+    // Emit stock update after commit (only if socket.io is available)
     const io = app.get("io");
-    io.emit("stock_update", { drop_id: drop.id, available_stock: drop.available_stock });
+    if (io) {
+      io.emit("stock_update", { drop_id: drop.id, available_stock: drop.available_stock });
+    }
 
     return { success: true, reservation };
   } catch (error) {

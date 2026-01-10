@@ -41,11 +41,14 @@ const completePurchase = async (user_id, drop_id, app) => {
     const user = await require("../models").User.findByPk(reservation.user_id);
 
     // Emit purchase update
+    // Emit purchase update
     const io = app.get("io");
-    io.emit("purchase_update", {
-      drop_id: drop_id,
-      user: { id: reservation.user_id, username: user ? user.username : "Unknown" },
-    });
+    if (io) {
+      io.emit("purchase_update", {
+        drop_id: drop_id,
+        user: { id: reservation.user_id, username: user ? user.username : "Unknown" },
+      });
+    }
 
     return { success: true, message: "Purchase completed", reservation };
   } catch (error) {
