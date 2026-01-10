@@ -2,7 +2,11 @@
     "rewrites": [
         {
             "source": "/api/(.*)",
-            "destination": "https://your-backend-url.vercel.app/api/$1"
+            "destination": "https://sneaker-drop-backend.vercel.app/api/$1"
+        },
+        {
+            "source": "/socket.io/(.*)",
+            "destination": "https://sneaker-drop-backend.vercel.app/socket.io/$1"
         },
         {
             "source": "/(.*)",
