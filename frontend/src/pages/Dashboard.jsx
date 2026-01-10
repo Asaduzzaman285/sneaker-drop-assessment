@@ -24,6 +24,78 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (activeReservation) {
+      const expiresAt = new Date(activeReservation.reservation.expires_at).getTime();
+
+      timerRef.current = setInterval(() => {
+        const now = new Date().getTime();
+        const diff = Math.ceil((expiresAt - now) / 1000);
+
+        if (diff <= 0) {
+          clearInterval(timerRef.current);
+          setActiveReservation(null);
+          setTimeLeft(0);
+          alert("Reservation expired!");
+        } else {
+          setTimeLeft(diff);
+        }
+      }, 1000);
+    }
+
+    return () => clearInterval(timerRef.current);
+  }, [activeReservation]);
+
+  const fetchDrops = async () => {
+    try {
+      const res = await getDrops();
+      setDrops(
+        res.data.map((d) => ({
+          ...d,
+          recentPurchasers: Array.isArray(d.recent_purchasers) ? d.recent_purchasers : [],
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const onReserve = async (drop_id) => {
+    if (activeReservation) {
+      alert("You already have an active reservation!");
+      return;
+    }
+    try {
+      const res = await reserveDrop(drop_id, user_id);
+      setActiveReservation(res.data);
+      // alert(res.data.message);
+      fetchDrops();
+    } catch (err) {
+      console.error(err);
+      if (err.response) {
+        alert(err.response.data.message);
+      }
+    }
+  };
+
+  const onPurchase = async () => {
+    if (!activeReservation) return;
+    try {
+      const dropId = activeReservation.reservation.drop_id;
+      const res = await completePurchase(dropId, user_id);
+      console.log("Purchase Successful!");
+      // alert("Purchase Successful!"); // Removed to prevent blocking
+      setActiveReservation(null);
+      clearInterval(timerRef.current);
+      fetchDrops();
+    } catch (err) {
+      console.error(err);
+      if (err.response) {
+        alert(err.response.data.message);
+      }
+    }
+  };
+
   const onStockUpdate = (data) => {
     console.log("Stock update received:", data);
     setDrops((prev) =>
