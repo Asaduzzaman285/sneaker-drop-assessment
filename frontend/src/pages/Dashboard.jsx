@@ -12,7 +12,7 @@ export default function Dashboard() {
   const user_id = 1; // Hardcoded for demo
   const timerRef = useRef(null);
 
-  // Auto-Refresh Strategy (Replaces Socket.io for Vercel Stability)
+  // Polling fallback to ensure data consistency in serverless environments
   useEffect(() => {
     fetchDrops(); // Initial fetch
 
@@ -124,7 +124,7 @@ export default function Dashboard() {
     );
   };
 
-  // Hybrid Approach: Socket for "Assessment" + Polling for "Vercel Stability"
+  // Real-time updates via WebSocket
   useSocket(onStockUpdate, onPurchaseUpdate);
 
   return (

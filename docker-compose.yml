@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  # Postgres Database
+  db:
+    image: postgres:15-alpine
+    container_name: sneaker_db
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: sneaker_drop
+    ports:
+      - "5433:5432" # Use 5433 explicitly to avoid conflict with local Postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: sneaker_backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DATABASE_URL=postgres://root:root@db:5432/sneaker_drop
+      - NODE_ENV=development
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Frontend App
+  frontend:
+    build: ./frontend
+    container_name: sneaker_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:4000
+      - VITE_API_TARGET=http://backend:4000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

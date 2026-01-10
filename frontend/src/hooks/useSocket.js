@@ -5,11 +5,20 @@ let socket;
 
 export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
   useEffect(() => {
-    socket = io({
-      transports: ["polling"], // Force long-polling for Vercel Serverless stability
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-    });
+    // Detect if we are on Vercel (Production) or Localhost
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+    // Vercel = Polling (Stable)
+    // Local/Docker = WebSockets (Fast/Standard)
+    const socketOptions = isLocal
+      ? { transports: ["websocket", "polling"] } // Prefer WebSocket locally
+      : {
+        transports: ["polling"],  // Force polling on Vercel
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+      };
+
+    socket = io(socketOptions);
 
     socket.on("connect", () => console.log("⚡ Connected to Socket.io"));
 
