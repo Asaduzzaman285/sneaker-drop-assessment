@@ -6,6 +6,7 @@ console.log(`🛠 Database Config: NODE_ENV=${process.env.NODE_ENV}, SSL=${isPro
 
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
+  dialectModule: require('pg'), // Required for Vercel/Webpack to detect the dependency
   logging: false,
   dialectOptions: isProduction
     ? {
