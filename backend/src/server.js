@@ -4,6 +4,7 @@ const { sequelize } = require("./models");
 const http = require("http");
 
 const PORT = process.env.PORT || 4000;
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Create server
 const server = http.createServer(app);
@@ -28,13 +29,24 @@ let isDbConnected = false;
 async function startServer() {
   if (!isDbConnected) {
     try {
+      if (!process.env.DATABASE_URL) {
+        throw new Error("DATABASE_URL is missing!");
+      }
+
       await sequelize.authenticate();
       console.log("✅ Database connected");
-      await sequelize.sync({ alter: true });
-      console.log("✅ Database synced");
+
+      // WARNING: Syncing on every request is bad for Vercel (timeouts). 
+      // Only run if locally or explicitly safely.
+      if (!isProduction) {
+        await sequelize.sync({ alter: true });
+        console.log("✅ Database synced");
+      }
+
       isDbConnected = true;
     } catch (error) {
       console.error("❌ Startup error:", error);
+      throw error; // Propagate to caller
     }
   }
 }
@@ -51,7 +63,14 @@ if (require.main === module) {
   })();
 } else {
   // Vercel Serverless Entry Point
+  // Vercel Serverless Entry Point
   module.exports = async (req, res) => {
+    // 1. Sanity Check (Bypasses DB)
+    if (req.url && req.url.includes('/sanity')) {
+      res.setHeader('Content-Type', 'text/plain');
+      return res.status(200).send("Sanity Check OK - Server is Alive");
+    }
+
     try {
       await startServer();
       return app(req, res);
