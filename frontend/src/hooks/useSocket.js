@@ -8,17 +8,21 @@ export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
     // Detect if we are on Vercel (Production) or Localhost
     const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
-    // Vercel = Polling (Stable)
-    // Local/Docker = WebSockets (Fast/Standard)
+    // Prefer WebSocket locally, Polling on Vercel/Prod
     const socketOptions = isLocal
-      ? { transports: ["websocket", "polling"] } // Prefer WebSocket locally
+      ? { transports: ["websocket", "polling"] }
       : {
-        transports: ["polling"],  // Force polling on Vercel
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
-      };
+          transports: ["polling"],
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+        };
 
-    const backendUrl = import.meta.env.VITE_SOCKET_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api$/, "") : undefined);
+    // Resolve backend Socket.io URL via envs
+    const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
+    const envApiUrl = import.meta.env.VITE_API_URL;
+    const derivedSocketUrl = envApiUrl ? envApiUrl.replace(/\/api\/?$/, "") : undefined;
+
+    const backendUrl = envSocketUrl || derivedSocketUrl || (isLocal ? "http://localhost:4000" : window.location.origin);
     socket = io(backendUrl, socketOptions);
 
     socket.on("connect", () => console.log("⚡ Connected to Socket.io"));
