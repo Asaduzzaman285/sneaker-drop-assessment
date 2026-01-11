@@ -1,81 +1,73 @@
 require("dotenv").config();
-const app = require("./app"); // your express app
+const app = require("./app");
 const { sequelize } = require("./models");
 const http = require("http");
-const { Server } = require("socket.io");
+const { initSocket } = require("./sockets/socket");
+const expireReservations = require("./workers/expireReservations");
 
 const PORT = process.env.PORT || 4000;
 
-// Create server - this is used for local development
+// Create HTTP server
 const server = http.createServer(app);
-const expireReservations = require("./workers/expireReservations");
 
 // Database & Server Startup Logic
 let isDbConnected = false;
 
 async function startServer() {
-  if (!isDbConnected) {
-    try {
-      if (!process.env.DATABASE_URL) {
-        throw new Error("DATABASE_URL is missing!");
-      }
+  if (isDbConnected) return;
 
-      await sequelize.authenticate();
-      console.log("✅ Database connected");
-
-      const enableSync = process.env.DB_SYNC === 'true';
-      if (enableSync) {
-        await sequelize.sync({ alter: true });
-        console.log("✅ Database synced");
-      } else {
-        console.log("⚠️ Skipping sequelize sync (DB_SYNC !== 'true')");
-      }
-
-      isDbConnected = true;
-    } catch (error) {
-      console.error("❌ Startup error:", error);
-      throw error; // Propagate to caller
+  try {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL environment variable is missing!");
     }
+
+    await sequelize.authenticate();
+    console.log("✅ Database connected successfully.");
+
+    const enableSync = process.env.DB_SYNC === 'true';
+    if (enableSync) {
+      await sequelize.sync({ alter: true });
+      console.log("✅ Database schema synced.");
+    } else {
+      console.log("ℹ️ Skipping database sync (DB_SYNC is not 'true').");
+    }
+
+    isDbConnected = true;
+  } catch (error) {
+    console.error("❌ Database connection or sync failed:", error);
+    // Exit gracefully if DB connection fails, as the app is unusable.
+    process.exit(1);
   }
 }
 
-// Local Development Server
+// --- Entry Points ---
+
+// Local/Docker Development Entry Point
 if (require.main === module) {
   (async () => {
     await startServer();
-    const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
-    const io = new Server(server, {
-      cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"],
-      },
-    });
-    app.set("io", io);
+
+    // Initialize Socket.IO and attach it to the server
+    initSocket(server);
 
     server.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      expireReservations(app);
-      setInterval(() => expireReservations(app), 30 * 1000);
+      console.log(`🚀 Server running on port ${PORT} (local/docker mode)`);
+      
+      // Start the reservation expiration worker for the local environment
+      console.log("🕒 Starting reservation expiration worker (runs every 15 seconds)...");
+      setInterval(() => {
+        console.log("Running scheduled job: expireReservations");
+        expireReservations();
+      }, 15000); // run every 15 seconds
     });
   })();
-} else {
-  // Vercel Serverless Entry Point
+}
+// Vercel Serverless Entry Point
+else {
   module.exports = async (req, res) => {
+    // For serverless, we only need to ensure the DB is ready on each invocation.
+    // The cron job will handle expirations separately.
     await startServer();
-
-    if (!res.socket.server.io) {
-      console.log("First request, attaching socket.io...");
-      const io = new Server(res.socket.server, {
-        path: "/socket.io",
-        cors: {
-          origin: ["https://sneaker-drop-front-end.vercel.app", "http://localhost:5173"],
-          methods: ["GET", "POST"],
-        },
-      });
-      res.socket.server.io = io;
-      app.set("io", io);
-    }
-    
     return app(req, res);
   };
 }

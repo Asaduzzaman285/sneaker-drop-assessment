@@ -9,7 +9,8 @@ async function reserveItemController(req, res) {
       return res.status(400).json({ message: "user_id or userId is required" });
     }
 
-    const result = await reserveItem(userId, dropId,req.app);
+    // The 'app' argument is no longer needed as the service now handles socket.io internally
+    const result = await reserveItem(userId, dropId);
 
     if (!result.success) {
       if (result.message === "OUT_OF_STOCK") {

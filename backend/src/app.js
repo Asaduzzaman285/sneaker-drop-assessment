@@ -4,6 +4,7 @@ const cors = require("cors");
 const dropRoutes = require("./routes/drop.routes");
 const reservationRoutes = require("./routes/reservation.routes");
 const purchaseRoutes = require("./routes/purchase.routes");
+const cronRoutes = require("./routes/cron.routes"); // Import cron routes
 const app = express();
 
 const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
@@ -23,4 +24,6 @@ app.get("/api/health", (req, res) => {
 app.use("/api/drops", dropRoutes);
 app.use("/api", reservationRoutes);
 app.use("/api/purchase", purchaseRoutes);
+app.use("/api/cron", cronRoutes); // Use cron routes
+
 module.exports = app;

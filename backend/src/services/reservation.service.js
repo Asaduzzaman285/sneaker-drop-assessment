@@ -1,11 +1,10 @@
 const { sequelize, Drop, Reservation } = require("../models");
-const { Op } = require("sequelize");
+const { getIO } = require('../sockets/socket');
 
-const reserveItem = async (user_id, drop_id, app) => {
+const reserveItem = async (user_id, drop_id) => {
   const t = await sequelize.transaction();
 
   try {
-    // Fetch drop with lock
     const drop = await Drop.findByPk(drop_id, {
       lock: t.LOCK.UPDATE,
       transaction: t,
@@ -15,38 +14,33 @@ const reserveItem = async (user_id, drop_id, app) => {
       if (!t.finished) await t.rollback();
       return { success: false, message: "DROP_NOT_FOUND" };
     }
-    // Prevent duplicate active reservation for this user/drop
+
     let existingReservation = await Reservation.findOne({
       where: { user_id, drop_id, status: "ACTIVE" },
       lock: t.LOCK.UPDATE,
       transaction: t,
     });
 
-    // If there is an existing ACTIVE reservation but it's past expiry, expire it in-transaction
-    if (existingReservation && existingReservation.expires_at && existingReservation.expires_at < new Date()) {
+    if (existingReservation && existingReservation.expires_at < new Date()) {
       existingReservation.status = "EXPIRED";
       await existingReservation.save({ transaction: t });
-
-      // Restore stock because the old reservation freed a slot
-      drop.available_stock += 1;
-      await drop.save({ transaction: t });
-
-      existingReservation = null;
+      await drop.increment('available_stock', { by: 1, transaction: t });
+      existingReservation = null; // Clear it so we can create a new one
     }
 
-    // If after cleanup reservation still exists and is not expired, block duplicate
     if (existingReservation) {
       if (!t.finished) await t.rollback();
       return { success: false, message: "ALREADY_RESERVED" };
     }
+    
+    // Refetch drop to get the most up-to-date stock count after potential expiration
+    const currentDrop = await Drop.findByPk(drop_id, { transaction: t, lock: t.LOCK.UPDATE });
 
-    // Check stock after potential cleanup
-    if (drop.available_stock <= 0) {
+    if (currentDrop.available_stock <= 0) {
       if (!t.finished) await t.rollback();
       return { success: false, message: "OUT_OF_STOCK" };
     }
 
-    // Create reservation
     const reservation = await Reservation.create(
       {
         user_id,
@@ -57,24 +51,22 @@ const reserveItem = async (user_id, drop_id, app) => {
       { transaction: t }
     );
 
-    // Decrement available stock
-    drop.available_stock -= 1;
-    await drop.save({ transaction: t });
+    currentDrop.available_stock -= 1;
+    await currentDrop.save({ transaction: t });
 
-    // Commit transaction
     await t.commit();
 
-    // Emit stock update after commit (only if socket.io is available)
-    const io = app.get("io");
-    if (io) {
-      io.emit("stock_update", { drop_id: drop.id, available_stock: drop.available_stock });
+    try {
+      const io = getIO();
+      io.emit("stock_update", { dropId: currentDrop.id, availableStock: currentDrop.available_stock });
+    } catch (socketError) {
+      console.error("Socket.IO emit failed, but reservation was successful:", socketError.message);
     }
 
-    return { success: true, reservation, availableStock: drop.available_stock };
+    return { success: true, reservation, availableStock: currentDrop.available_stock };
   } catch (error) {
-    // Only rollback if transaction is still active
     if (t && !t.finished) await t.rollback();
-    console.error("Controller error:", error);
+    console.error("Reservation service error:", error);
     return { success: false, message: "RESERVATION_FAILED" };
   }
 };
