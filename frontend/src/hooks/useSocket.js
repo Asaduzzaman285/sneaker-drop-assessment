@@ -1,37 +1,49 @@
 import { useEffect } from "react";
 import { io } from "socket.io-client";
 
-let socket;
-
 export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
   useEffect(() => {
-    // Detect if we are on Vercel (Production) or Localhost
-    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-    // Prefer WebSocket locally, Polling on Vercel/Prod
-    const socketOptions = isLocal
-      ? { transports: ["websocket", "polling"] }
-      : {
-          transports: ["polling"],
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-        };
-
-    // Resolve backend Socket.io URL via envs
-    const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
-    const backendUrl = envSocketUrl || (isLocal ? "http://localhost:4000" : undefined);
-    if (!backendUrl) {
-      console.error("Missing VITE_SOCKET_URL in production. Set it to your backend Socket.io URL, e.g. https://sneaker-drop-backend.vercel.app");
+    // In production (Vercel), we rely on the HTTP polling already in Dashboard.jsx.
+    // Therefore, we do not establish a socket connection.
+    if (import.meta.env.PROD) {
+      console.log("In production, skipping socket connection. Using polling.");
       return;
     }
-    socket = io(backendUrl, socketOptions);
 
-    socket.on("connect", () => console.log("⚡ Connected to Socket.io"));
-    socket.on("connect_error", (error) => console.error("⚠️ Socket connect error:", error));
+    // In development, connect to the socket for real-time updates.
+    const VITE_SOCKET_URL =
+      import.meta.env.VITE_SOCKET_URL || "http://localhost:4000";
 
-    socket.on("stock_update", (data) => onStockUpdate(data));
-    socket.on("purchase_update", (data) => onPurchaseUpdate(data));
+    const socket = io(VITE_SOCKET_URL, {
+      transports: ["websocket", "polling"],
+    });
 
-    return () => socket.disconnect();
-  }, []);
+    socket.on("connect", () => {
+      console.log("⚡ Socket connected for real-time updates:", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Socket disconnected.");
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("⚠️ Socket connection error:", error);
+    });
+
+    if (onStockUpdate) {
+      socket.on("stock_update", onStockUpdate);
+    }
+    if (onPurchaseUpdate) {
+      socket.on("purchase_update", onPurchaseUpdate);
+    }
+
+    // Cleanup on component unmount
+    return () => {
+      if (socket) {
+        socket.off("stock_update");
+        socket.off("purchase_update");
+        socket.disconnect();
+      }
+    };
+  }, [onStockUpdate, onPurchaseUpdate]);
 };
