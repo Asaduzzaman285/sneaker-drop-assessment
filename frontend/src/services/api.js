@@ -1,11 +1,17 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_API_URL;
-if (!import.meta.env.VITE_API_URL) {
-  throw new Error("Missing VITE_API_URL. Set it to your backend base URL, e.g. https://sneaker-drop-backend.vercel.app/api");
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const envApiUrl = import.meta.env.VITE_API_URL;
+const baseURL = envApiUrl || (isLocal ? "/api" : undefined);
+if (!envApiUrl) {
+  if (isLocal) {
+    console.warn("VITE_API_URL is missing. Using local '/api' fallback. Set VITE_API_URL to your backend base URL for production.");
+  } else {
+    console.error("Missing VITE_API_URL in production. Set it to your backend base URL, e.g. https://sneaker-drop-backend.vercel.app/api");
+  }
 }
 const API = axios.create({
-  baseURL: baseURL,
+  baseURL,
 });
 
 export const getDrops = () => API.get("/drops");
