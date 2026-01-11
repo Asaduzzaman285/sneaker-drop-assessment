@@ -18,9 +18,11 @@ export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
         reconnectionDelay: 1000
       };
 
-    socket = io(socketOptions);
+    const backendUrl = import.meta.env.VITE_SOCKET_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api$/, "") : undefined);
+    socket = io(backendUrl, socketOptions);
 
     socket.on("connect", () => console.log("⚡ Connected to Socket.io"));
+    socket.on("connect_error", (error) => console.error("⚠️ Socket connect error:", error));
 
     socket.on("stock_update", (data) => onStockUpdate(data));
     socket.on("purchase_update", (data) => onPurchaseUpdate(data));

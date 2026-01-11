@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "/api", // Relative path to use proxy (dev) or vercel rewrite (prod)
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 export const getDrops = () => API.get("/drops");

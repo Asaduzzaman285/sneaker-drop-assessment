@@ -10,9 +10,13 @@ const reserveItem = async (user_id, drop_id, app) => {
       transaction: t,
     });
 
-    if (!drop || drop.available_stock <= 0) {
+    if (!drop) {
       if (!t.finished) await t.rollback();
-      return { success: false, message: "Out of stock" };
+      return { success: false, message: "DROP_NOT_FOUND" };
+    }
+    if (drop.available_stock <= 0) {
+      if (!t.finished) await t.rollback();
+      return { success: false, message: "OUT_OF_STOCK" };
     }
 
     // Prevent duplicate active reservation
@@ -24,7 +28,7 @@ const reserveItem = async (user_id, drop_id, app) => {
 
     if (existingReservation) {
       if (!t.finished) await t.rollback();
-      return { success: false, message: "Already reserved" };
+      return { success: false, message: "ALREADY_RESERVED" };
     }
 
     // Create reservation
@@ -51,12 +55,12 @@ const reserveItem = async (user_id, drop_id, app) => {
       io.emit("stock_update", { drop_id: drop.id, available_stock: drop.available_stock });
     }
 
-    return { success: true, reservation };
+    return { success: true, reservation, availableStock: drop.available_stock };
   } catch (error) {
     // Only rollback if transaction is still active
     if (t && !t.finished) await t.rollback();
     console.error("Controller error:", error);
-    return { success: false, message: "Reservation failed" };
+    return { success: false, message: "RESERVATION_FAILED" };
   }
 };
 

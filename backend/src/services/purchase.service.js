@@ -12,14 +12,14 @@ const completePurchase = async (user_id, drop_id, app) => {
     });
 
     if (!reservation) {
-      await t.rollback();
-      return { success: false, message: "No active reservation found" };
+      if (t && !t.finished) await t.rollback();
+      return { success: false, message: "RESERVATION_NOT_FOUND" };
     }
 
     // Check reservation expiration
     if (reservation.expires_at && reservation.expires_at < new Date()) {
-      await t.rollback();
-      return { success: false, message: "Reservation expired" };
+      if (t && !t.finished) await t.rollback();
+      return { success: false, message: "RESERVATION_EXPIRED" };
     }
 
     // Complete reservation
@@ -50,11 +50,11 @@ const completePurchase = async (user_id, drop_id, app) => {
       });
     }
 
-    return { success: true, message: "Purchase completed", reservation };
+    return { success: true, message: "PURCHASE_COMPLETED", reservation };
   } catch (error) {
-    if (t) await t.rollback();
+    if (t && !t.finished) await t.rollback();
     console.error(error);
-    return { success: false, message: "Purchase failed" };
+    return { success: false, message: "PURCHASE_FAILED" };
   }
 };
 

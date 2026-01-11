@@ -6,11 +6,22 @@ async function purchaseController(req, res) {
 
   try {
     const result = await completePurchase(user_id, drop_id,req.app);
-    if (result.success) return res.status(200).json(result);
-    return res.status(400).json(result);
+    if (!result.success) {
+      if (result.message === "RESERVATION_NOT_FOUND") {
+        return res.status(404).json({ message: "Reservation not found" });
+      }
+      if (result.message === "RESERVATION_EXPIRED") {
+        return res.status(410).json({ message: "Reservation expired" });
+      }
+      return res.status(500).json({ message: "Purchase failed" });
+    }
+    return res.status(200).json({
+      message: "Purchase completed",
+      reservation: result.reservation
+    });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error("Controller error:", error);
+    return res.status(500).json({ message: "Purchase failed" });
   }
 }
 

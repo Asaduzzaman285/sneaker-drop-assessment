@@ -11,9 +11,10 @@ const server = http.createServer(app);
 
 // Socket.io setup
 const { Server } = require("socket.io");
+const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
 const io = new Server(server, {
   cors: {
-    origin: "*", // allow all origins for now
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
   },
 });
@@ -36,11 +37,14 @@ async function startServer() {
       await sequelize.authenticate();
       console.log("✅ Database connected");
 
-      // WARNING: Syncing on every request is bad for Vercel (timeouts). 
-      // Only run if locally or explicitly safely.
-      if (!isProduction) {
+      // WARNING: Syncing on every request is bad for Vercel/timeouts and can rewrite DB volumes.
+      // Only run when explicitly enabled via DB_SYNC=true.
+      const enableSync = process.env.DB_SYNC === 'true';
+      if (enableSync) {
         await sequelize.sync({ alter: true });
         console.log("✅ Database synced");
+      } else {
+        console.log("⚠️ Skipping sequelize sync (DB_SYNC !== 'true')");
       }
 
       isDbConnected = true;
@@ -56,9 +60,9 @@ async function startServer() {
 if (require.main === module) {
   (async () => {
     await startServer();
-    setInterval(() => expireReservations(app), 5 * 1000); // 5 sec interval
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
+      setInterval(() => expireReservations(app), 30 * 1000); // 30 sec interval
     });
   })();
 } else {

@@ -6,11 +6,16 @@ const reservationRoutes = require("./routes/reservation.routes");
 const purchaseRoutes = require("./routes/purchase.routes");
 const app = express();
 
-app.use(cors());
+const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
+app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
 
 app.get("/health", (req, res) => {
+  res.json({ status: "OK" });
+});
+
+app.get("/api/health", (req, res) => {
   res.json({ status: "OK" });
 });
 
