@@ -114,3 +114,35 @@ This project simulates a high-traffic, real-time inventory system. I faced sever
 
 ---
 
+## Database Schema
+
+The system uses the following core tables:
+
+### drops
+- `id` (PK)
+- `name`
+- `total_stock`
+- `available_stock`
+- `created_at`
+
+### reservations
+- `id` (PK)
+- `drop_id` (FK → drops.id)
+- `user_id`
+- `status` (ACTIVE | EXPIRED | COMPLETED)
+- `expires_at`
+- `created_at`
+
+### purchases
+- `id` (PK)
+- `drop_id` (FK → drops.id)
+- `user_id`
+- `created_at`
+
+### Schema Setup
+- In **Docker**, tables are auto-created via Sequelize `sync()`.
+- In **Local/Production**, Sequelize handles schema initialization automatically on server start.
+
+## Demo
+
+[Watch the demo on YouTube](https://www.youtube.com/watch?v=Eod_INae4IA)
