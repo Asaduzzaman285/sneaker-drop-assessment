@@ -19,10 +19,11 @@ export const useSocket = (onStockUpdate, onPurchaseUpdate) => {
 
     // Resolve backend Socket.io URL via envs
     const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
-    const envApiUrl = import.meta.env.VITE_API_URL;
-    const derivedSocketUrl = envApiUrl ? envApiUrl.replace(/\/api\/?$/, "") : undefined;
-
-    const backendUrl = envSocketUrl || derivedSocketUrl || (isLocal ? "http://localhost:4000" : window.location.origin);
+    const backendUrl = envSocketUrl || (isLocal ? "http://localhost:4000" : undefined);
+    if (!backendUrl) {
+      console.error("Missing VITE_SOCKET_URL in production. Set it to your backend Socket.io URL, e.g. https://sneaker-drop-backend.vercel.app");
+      return;
+    }
     socket = io(backendUrl, socketOptions);
 
     socket.on("connect", () => console.log("⚡ Connected to Socket.io"));

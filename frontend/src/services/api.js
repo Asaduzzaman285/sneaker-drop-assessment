@@ -1,8 +1,8 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.DEV ? (import.meta.env.VITE_API_URL || "/api") : import.meta.env.VITE_API_URL;
-if (!import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
-  console.error("Missing VITE_API_URL in production. Set it to your backend base URL, e.g. https:\/\/your-backend.example.com\/api");
+const baseURL = import.meta.env.VITE_API_URL;
+if (!import.meta.env.VITE_API_URL) {
+  throw new Error("Missing VITE_API_URL. Set it to your backend base URL, e.g. https://sneaker-drop-backend.vercel.app/api");
 }
 const API = axios.create({
   baseURL: baseURL,
