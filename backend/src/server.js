@@ -2,26 +2,12 @@ require("dotenv").config();
 const app = require("./app"); // your express app
 const { sequelize } = require("./models");
 const http = require("http");
+const { Server } = require("socket.io");
 
 const PORT = process.env.PORT || 4000;
-const isProduction = process.env.NODE_ENV === 'production';
 
-// Create server
+// Create server - this is used for local development
 const server = http.createServer(app);
-
-// Socket.io setup
-const { Server } = require("socket.io");
-const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-  },
-});
-
-// Make io accessible in controllers/services
-app.set("io", io);
-
 const expireReservations = require("./workers/expireReservations");
 
 // Database & Server Startup Logic
@@ -37,8 +23,6 @@ async function startServer() {
       await sequelize.authenticate();
       console.log("✅ Database connected");
 
-      // WARNING: Syncing on every request is bad for Vercel/timeouts and can rewrite DB volumes.
-      // Only run when explicitly enabled via DB_SYNC=true.
       const enableSync = process.env.DB_SYNC === 'true';
       if (enableSync) {
         await sequelize.sync({ alter: true });
@@ -55,35 +39,43 @@ async function startServer() {
   }
 }
 
-// Start worker loop only if not in serverless (mostly for local) or try to run it
-// Note: setInteval expires in Vercel. We need a cron job for production really.
+// Local Development Server
 if (require.main === module) {
   (async () => {
     await startServer();
+    const allowedOrigins = ["https://sneaker-drop-front-end.vercel.app","http://localhost:5173"];
+    const io = new Server(server, {
+      cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+      },
+    });
+    app.set("io", io);
+
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      // Run once immediately to catch up any stale reservations
       expireReservations(app);
-      // Run periodically
       setInterval(() => expireReservations(app), 30 * 1000);
     });
   })();
 } else {
   // Vercel Serverless Entry Point
-  // Vercel Serverless Entry Point
   module.exports = async (req, res) => {
-    // 1. Sanity Check (Bypasses DB)
-    if (req.url && req.url.includes('/sanity')) {
-      res.setHeader('Content-Type', 'text/plain');
-      return res.status(200).send("Sanity Check OK - Server is Alive");
-    }
+    await startServer();
 
-    try {
-      await startServer();
-      return app(req, res);
-    } catch (error) {
-      console.error("Vercel Startup Error:", error);
-      res.status(500).json({ error: "Server Startup Failed", details: error.message });
+    if (!res.socket.server.io) {
+      console.log("First request, attaching socket.io...");
+      const io = new Server(res.socket.server, {
+        path: "/socket.io",
+        cors: {
+          origin: ["https://sneaker-drop-front-end.vercel.app", "http://localhost:5173"],
+          methods: ["GET", "POST"],
+        },
+      });
+      res.socket.server.io = io;
+      app.set("io", io);
     }
+    
+    return app(req, res);
   };
 }
