@@ -8,14 +8,18 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
   dialectModule: require('pg'), // Required for Vercel/Webpack to detect the dependency
   logging: false,
+  timezone: "+00:00",
   dialectOptions: isProduction
     ? {
       ssl: {
         require: true,
         rejectUnauthorized: false,
       },
+      useUTC: true,
     }
-    : {},
+    : {
+      useUTC: true,
+    },
 });
 
 module.exports = sequelize;

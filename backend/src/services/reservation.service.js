@@ -1,4 +1,5 @@
 const { sequelize, Drop, Reservation } = require("../models");
+const { Op } = require("sequelize");
 
 const reserveItem = async (user_id, drop_id, app) => {
   const t = await sequelize.transaction();
@@ -14,21 +15,35 @@ const reserveItem = async (user_id, drop_id, app) => {
       if (!t.finished) await t.rollback();
       return { success: false, message: "DROP_NOT_FOUND" };
     }
-    if (drop.available_stock <= 0) {
-      if (!t.finished) await t.rollback();
-      return { success: false, message: "OUT_OF_STOCK" };
-    }
-
-    // Prevent duplicate active reservation
-    const existingReservation = await Reservation.findOne({
+    // Prevent duplicate active reservation for this user/drop
+    let existingReservation = await Reservation.findOne({
       where: { user_id, drop_id, status: "ACTIVE" },
       lock: t.LOCK.UPDATE,
       transaction: t,
     });
 
+    // If there is an existing ACTIVE reservation but it's past expiry, expire it in-transaction
+    if (existingReservation && existingReservation.expires_at && existingReservation.expires_at < new Date()) {
+      existingReservation.status = "EXPIRED";
+      await existingReservation.save({ transaction: t });
+
+      // Restore stock because the old reservation freed a slot
+      drop.available_stock += 1;
+      await drop.save({ transaction: t });
+
+      existingReservation = null;
+    }
+
+    // If after cleanup reservation still exists and is not expired, block duplicate
     if (existingReservation) {
       if (!t.finished) await t.rollback();
       return { success: false, message: "ALREADY_RESERVED" };
+    }
+
+    // Check stock after potential cleanup
+    if (drop.available_stock <= 0) {
+      if (!t.finished) await t.rollback();
+      return { success: false, message: "OUT_OF_STOCK" };
     }
 
     // Create reservation

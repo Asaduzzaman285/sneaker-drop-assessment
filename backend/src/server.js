@@ -62,7 +62,10 @@ if (require.main === module) {
     await startServer();
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      setInterval(() => expireReservations(app), 30 * 1000); // 30 sec interval
+      // Run once immediately to catch up any stale reservations
+      expireReservations(app);
+      // Run periodically
+      setInterval(() => expireReservations(app), 30 * 1000);
     });
   })();
 } else {

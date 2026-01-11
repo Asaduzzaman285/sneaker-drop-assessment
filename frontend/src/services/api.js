@@ -1,7 +1,11 @@
 import axios from "axios";
 
+const baseURL = import.meta.env.DEV ? (import.meta.env.VITE_API_URL || "/api") : import.meta.env.VITE_API_URL;
+if (!import.meta.env.DEV && !import.meta.env.VITE_API_URL) {
+  console.error("Missing VITE_API_URL in production. Set it to your backend base URL, e.g. https:\/\/your-backend.example.com\/api");
+}
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: baseURL,
 });
 
 export const getDrops = () => API.get("/drops");
